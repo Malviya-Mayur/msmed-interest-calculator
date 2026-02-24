@@ -11,7 +11,7 @@ No Python, no server setup, no installation required for end users — just run 
 | Platform | Download | Notes |
 |---|---|---|
 | 🐧 **Linux** (x86-64) | [**msme_calculator-linux-x86_64**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64) | Single file, no install needed |
-| 🪟 **Windows** (x86-64) | [**All Releases →**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases) | Build with `build_windows.bat` on Windows |
+| 🪟 **Windows** (x86-64) | [**msme_calculator-windows-x86_64.exe**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-windows-x86_64.exe) | Single file, no install needed |
 
 > 📦 View all releases: [github.com/…/releases](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases)
 

@@ -30,4 +30,5 @@ Thumbs.db
 .vscode/
 
 # ── Temp uploads (generated at runtime) ───────────────────────────────
-msmed_calculator/uploads/
+msmed_calculator/uploads/msmed_calculator/msme_calculator.exe
+msmed_calculator/dist/
