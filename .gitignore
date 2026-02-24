@@ -1,0 +1,33 @@
+# ── Planning / working files (not part of the project) ──────────────
+/Data Mapping.txt
+/agent_prompt.md
+/msmed_plan.md
+/msmed_calculator_backup_20260222_225039/
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.egg-info/
+.eggs/
+
+# ── Virtual environments ──────────────────────────────────────────────
+.venv/
+.venv_build/
+venv/
+env/
+
+# ── PyInstaller build artifacts ───────────────────────────────────────
+msmed_calculator/build/
+msmed_calculator/dist/
+
+# ── OS / editor ────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# ── Temp uploads (generated at runtime) ───────────────────────────────
+msmed_calculator/uploads/

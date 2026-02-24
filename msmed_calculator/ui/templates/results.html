@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Results — MSMED Act Interest Calculator</title>
+    <meta name="description" content="MSMED Act interest calculation results — detailed ledger and vendor summary." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+    <div class="page-bg">
+        <!-- Header -->
+        <header class="site-header">
+            <div class="header-content">
+                <div class="logo-group">
+                    <div class="logo-icon">⚖️</div>
+                    <div>
+                        <h1 class="site-title">MSMED Act Interest Calculator</h1>
+                        <p class="site-subtitle">Calculation Results</p>
+                    </div>
+                </div>
+                <a href="/" class="btn-secondary">← Calculate Again</a>
+            </div>
+        </header>
+
+        <main class="main-container">
+
+            <!-- Warnings (non-fatal validation notices) -->
+            {% if warnings %}
+            <div class="alert alert-warning">
+                <div class="alert-header">⚠️ Notices</div>
+                <ul class="alert-list">
+                    {% for w in warnings %}
+                    <li>{{ w }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <!-- Meta info bar -->
+            <div class="result-meta">
+                <span>📄 <strong>File:</strong> {{ filename }}</span>
+                <span>📈 <strong>Interest Rate:</strong> {{ interest_rate }}% p.a.</span>
+                <span>📅 <strong>Credit Term:</strong> {{ credit_term_days }} Days</span>
+                <span>⚙️ <strong>Method:</strong>
+                    {% if interest_method == 'compound' %}Compound (Monthly Rests){% else %}Simple Interest{% endif %}
+                </span>
+            </div>
+
+            <!-- Download Button -->
+            <div class="download-bar">
+                <a href="/download" class="btn-download" id="download-btn">
+                    ⬇️ Download Full Report (Excel)
+                </a>
+                <span class="download-note">Includes Detailed Ledger + Summary sheets with formatting</span>
+            </div>
+
+            <!-- ── Summary Table ─────────────────────────────────────────────── -->
+            <div class="card results-card">
+                <div class="card-header">
+                    <h2 class="card-title">📊 Vendor Summary</h2>
+                    <p class="card-subtitle">Aggregated interest liability per vendor</p>
+                </div>
+                {% if summary %}
+                <div class="table-wrap">
+                    <table class="results-table" id="summary-table">
+                        <thead>
+                            <tr>
+                                {% for col in summary_columns %}
+                                <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in summary %}
+                            <tr>
+                                {% for col in summary_columns %}
+                                <td>
+                                    {% set val = row[col] %}
+                                    {% if '₹' in col %}
+                                    ₹ {{ "%.2f"|format(val|float) }}
+                                    {% else %}
+                                    {{ val }}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty-state">No summary data available.</p>
+                {% endif %}
+            </div>
+
+            <!-- ── Detailed Ledger Table ──────────────────────────────────────── -->
+            <div class="card results-card">
+                <div class="card-header">
+                    <h2 class="card-title">📋 Detailed Settlement Ledger</h2>
+                    <p class="card-subtitle">
+                        Showing {{ showing_rows }} of {{ total_rows }} rows
+                        {% if total_rows > 100 %} — download Excel for the full report{% endif %}
+                    </p>
+                </div>
+
+                <!-- Legend -->
+                <div class="ledger-legend">
+                    <span class="legend-item legend-interest">🔴 Interest-bearing settlement</span>
+                    <span class="legend-item legend-advance">⬜ Advance / on-time payment</span>
+                </div>
+
+                {% if ledger %}
+                <div class="table-wrap">
+                    <table class="results-table ledger-table" id="ledger-table">
+                        <thead>
+                            <tr>
+                                {% for col in ledger_columns %}
+                                <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in ledger %}
+                            {% set interest = row.get("Interest Amount (₹)", 0) %}
+                            <tr class="{% if interest and interest|float > 0 %}row-interest{% endif %}">
+                                {% for col in ledger_columns %}
+                                <td>
+                                    {% set val = row[col] %}
+                                    {% if val is none or val == 'None' or val == '' %}
+                                    <span class="null-val">—</span>
+                                    {% elif '₹' in col %}
+                                    {% if col == "Purchase Amount (₹)" %}
+                                    ₹ {{ "%.2f"|format(val|float) }}
+                                    {% else %}
+                                    ₹ {{ "%.2f"|format(val|float) }}
+                                    {% endif %}
+                                    {% elif col == "Settlement Type" %}
+                                    <span class="badge-type badge-{{ val|lower }}">{{ val }}</span>
+                                    {% elif col == "Days Overdue" %}
+                                    {% if val|int > 0 %}
+                                    <span class="days-late">{{ val }}</span>
+                                    {% else %}
+                                    <span class="days-ok">{{ val }}</span>
+                                    {% endif %}
+                                    {% else %}
+                                    {{ val }}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty-state">No ledger data available.</p>
+                {% endif %}
+            </div>
+
+            <!-- Action Bar -->
+            <div class="action-bar">
+                <a href="/" class="btn-secondary">← Calculate Again</a>
+                <a href="/download" class="btn-download">⬇️ Download Excel Report</a>
+            </div>
+
+        </main>
+
+        <footer class="site-footer">
+            <p>MSMED Act Interest Calculator · Built for compliance with <strong>Section 16 of MSMED Act, 2006</strong>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Highlight on hover for table rows
+        document.querySelectorAll('.results-table tbody tr').forEach(row => {
+            row.addEventListener('mouseenter', () => row.classList.add('row-hover'));
+            row.addEventListener('mouseleave', () => row.classList.remove('row-hover'));
+        });
+    </script>
+</body>
+
+</html>

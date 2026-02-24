@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MSMED Act Interest Calculator</title>
+  <meta name="description"
+    content="Calculate interest on delayed MSME vendor payments per Section 16 of the MSMED Act, 2006." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+  <div class="page-bg">
+    <!-- Hero Header -->
+    <header class="site-header">
+      <div class="header-content">
+        <div class="logo-group">
+          <div class="logo-icon">⚖️</div>
+          <div>
+            <h1 class="site-title">MSMED Act Interest Calculator</h1>
+            <p class="site-subtitle">Section 16 — Delayed Payment Interest</p>
+          </div>
+        </div>
+        <div class="badge">v1.0 · Official Use</div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container">
+      <!-- Info Banner -->
+      <div class="info-banner">
+        <span class="info-icon">ℹ️</span>
+        <p>This tool calculates interest payable to MSME vendors whose invoices were settled beyond the credit period,
+          as mandated by <strong>Section 16 of the MSMED Act, 2006</strong>. The statutory credit period is 45 days
+          but you can adjust it below based on your case.</p>
+      </div>
+
+      <!-- Error Messages -->
+      {% if errors %}
+      <div class="alert alert-error" id="error-area">
+        <div class="alert-header">⚠️ Validation Errors</div>
+        <ul class="alert-list">
+          {% for error in errors %}
+          <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- Upload Form -->
+      <div class="card upload-card">
+        <div class="card-header">
+          <h2 class="card-title">Upload Transaction Data</h2>
+          <p class="card-subtitle">Upload your vendor ledger in CSV or Excel format</p>
+        </div>
+
+        <form id="upload-form" method="post" action="/calculate" enctype="multipart/form-data">
+          <!-- File Upload -->
+          <div class="form-group">
+            <label class="form-label" for="file">
+              📂 Transaction File
+              <span class="required">*</span>
+            </label>
+            <div class="file-drop-zone" id="drop-zone">
+              <div class="file-icon">📊</div>
+              <p class="drop-text">Drag & drop your file here, or <span class="browse-link">browse</span></p>
+              <p class="drop-hint">Accepts <strong>.csv</strong> and <strong>.xlsx</strong> files</p>
+              <input type="file" id="file" name="file" accept=".csv,.xlsx,.xls" required class="file-input" />
+            </div>
+            <div class="file-selected" id="file-selected" style="display:none;">
+              <span class="file-icon-sm">📄</span>
+              <span id="file-name-display"></span>
+              <button type="button" class="clear-file" id="clear-file">✕</button>
+            </div>
+          </div>
+
+          <!-- Parameters Row -->
+          <div class="params-row">
+            <!-- Bank Rate -->
+            <div class="form-group">
+              <label class="form-label" for="interest_rate">
+                📈 Annual Interest Rate (%)
+                <span class="required">*</span>
+              </label>
+              <input type="number" id="interest_rate" name="interest_rate" value="{{ default_interest_rate }}"
+                step="0.01" min="0.01" max="100" required class="form-input" />
+              <p class="form-hint">Enter the annual interest rate to apply. Per MSMED Act Section 16, the rate is
+                typically <strong>3× the RBI bank rate</strong> (e.g. RBI rate 6.5% → enter 19.5%).</p>
+            </div>
+
+            <!-- Credit Term (editable) -->
+            <div class="form-group">
+              <label class="form-label" for="credit_term_days">
+                📅 Credit Term (Days)
+                <span class="required">*</span>
+              </label>
+              <input type="number" id="credit_term_days" name="credit_term_days" value="{{ default_credit_term }}"
+                step="1" min="1" max="180" required class="form-input" />
+              <p class="form-hint">Statutory limit is <strong>45 days</strong> per MSMED Act. Adjust only if a different
+                agreed period applies to your case.</p>
+            </div>
+          </div>
+
+          <!-- Interest Method Toggle -->
+          <div class="form-group" style="margin-top:0.25rem;">
+            <label class="form-label">⚙️ Interest Method</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input type="radio" name="interest_method" value="compound" checked />
+                <span class="radio-label">
+                  <strong>Compound (Monthly Rests)</strong>
+                  <span class="radio-hint">Per MSMED Act Section 16 — legally mandated</span>
+                </span>
+              </label>
+              <label class="radio-option">
+                <input type="radio" name="interest_method" value="simple" />
+                <span class="radio-label">
+                  <strong>Simple Interest</strong>
+                  <span class="radio-hint">Flat daily accrual — P × r × (days/365)</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Rate + Term Preview -->
+          <div class="rate-preview" id="rate-preview">
+            <span class="rate-label">Interest Rate:</span>
+            <span class="rate-value" id="rate-display">19.50%</span>
+            <span class="rate-note" id="method-note">p.a. · compound, monthly rests</span>
+            <span class="rate-label" style="margin-left:1.5rem;">· Credit Term:</span>
+            <span class="rate-value" id="term-display" style="font-size:1.1rem;">45 days</span>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="btn-submit" id="submit-btn">
+            <span class="btn-text">Calculate Interest</span>
+            <span class="btn-icon">→</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Required Column Format Info -->
+      <div class="card info-card">
+        <div class="card-header">
+          <h3 class="card-title">📋 Required File Format</h3>
+        </div>
+        <div class="table-wrap">
+          <table class="format-table">
+            <thead>
+              <tr>
+                <th>Column</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>transaction_id</code></td>
+                <td>string</td>
+                <td>Unique transaction identifier (optional)</td>
+              </tr>
+              <tr>
+                <td><code>vendor_id</code></td>
+                <td>string</td>
+                <td>Vendor / supplier identifier <strong>(required)</strong></td>
+              </tr>
+              <tr>
+                <td><code>vendor_name</code></td>
+                <td>string</td>
+                <td>Human-readable vendor name</td>
+              </tr>
+              <tr>
+                <td><code>transactions</code></td>
+                <td>float</td>
+                <td>Negative = Purchase, Positive = Payment <strong>(required)</strong></td>
+              </tr>
+              <tr>
+                <td><code>dates</code></td>
+                <td>YYYY-MM-DD</td>
+                <td>Date of transaction <strong>(required)</strong></td>
+              </tr>
+              <tr>
+                <td><code>narration</code></td>
+                <td>string</td>
+                <td>Free-text description (optional)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <footer class="site-footer">
+      <p>MSMED Act Interest Calculator · Built for compliance with <strong>Section 16 of MSMED Act, 2006</strong></p>
+    </footer>
+  </div>
+
+  <script>
+    // ── Preview updater (rate + credit term + method) ───────────────────────
+    const rateInput = document.getElementById('interest_rate');
+    const termInput = document.getElementById('credit_term_days');
+    const rateDisplay = document.getElementById('rate-display');
+    const termDisplay = document.getElementById('term-display');
+    const methodNote = document.getElementById('method-note');
+
+    function updatePreview() {
+      const rate = parseFloat(rateInput.value) || 0;
+      const days = parseInt(termInput.value) || 45;
+      const method = document.querySelector('input[name="interest_method"]:checked').value;
+      rateDisplay.textContent = rate.toFixed(2) + '%';
+      termDisplay.textContent = days + ' days';
+      methodNote.textContent = method === 'compound'
+        ? 'p.a. · compound, monthly rests'
+        : 'p.a. · simple interest';
+    }
+    rateInput.addEventListener('input', updatePreview);
+    termInput.addEventListener('input', updatePreview);
+    document.querySelectorAll('input[name="interest_method"]').forEach(
+      el => el.addEventListener('change', updatePreview)
+    );
+    updatePreview();
+
+    // ── File input drag & drop ────────────────────────────────────────────
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file');
+    const fileSelected = document.getElementById('file-selected');
+    const fileNameDisplay = document.getElementById('file-name-display');
+    const clearFileBtn = document.getElementById('clear-file');
+    const browseLink = dropZone.querySelector('.browse-link');
+
+    browseLink.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('click', (e) => { if (e.target !== browseLink) fileInput.click(); });
+
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        showFile(e.dataTransfer.files[0].name);
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length) showFile(fileInput.files[0].name);
+    });
+
+    function showFile(name) {
+      dropZone.style.display = 'none';
+      fileSelected.style.display = 'flex';
+      fileNameDisplay.textContent = name;
+    }
+
+    clearFileBtn.addEventListener('click', () => {
+      fileInput.value = '';
+      dropZone.style.display = 'flex';
+      fileSelected.style.display = 'none';
+    });
+
+    // ── Submit loading state ──────────────────────────────────────────────
+    document.getElementById('upload-form').addEventListener('submit', () => {
+      const btn = document.getElementById('submit-btn');
+      btn.classList.add('loading');
+      btn.querySelector('.btn-text').textContent = 'Calculating…';
+    });
+  </script>
+</body>
+
+</html>

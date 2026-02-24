@@ -1,0 +1,8 @@
+transaction_id,vendor_id,vendor_name,transactions,dates
+TXN001,V01,ABC Suppliers,-100000,2025-04-01
+TXN002,V01,ABC Suppliers,-15000,2025-05-06
+TXN003,V01,ABC Suppliers,-30210,2025-07-31
+TXN004,V01,ABC Suppliers,100000,2025-08-18
+TXN005,V01,ABC Suppliers,-65000,2025-11-25
+TXN006,V01,ABC Suppliers,80000,2025-10-19
+TXN007,V01,ABC Suppliers,50000,2025-10-31
