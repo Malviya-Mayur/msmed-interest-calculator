@@ -3,6 +3,7 @@
 /agent_prompt.md
 /msmed_plan.md
 /msmed_calculator_backup_20260222_225039/
+/msmed_calculator/
 
 # ── Python ────────────────────────────────────────────────────────────
 __pycache__/
@@ -10,7 +11,6 @@ __pycache__/
 *.pyo
 .pytest_cache/
 *.egg-info/
-.eggs/
 
 # ── Virtual environments ──────────────────────────────────────────────
 .venv/
@@ -19,8 +19,10 @@ venv/
 env/
 
 # ── PyInstaller build artifacts ───────────────────────────────────────
-msmed_calculator/build/
-msmed_calculator/dist/
+/build/
+/dist/
+msme_calculator.exe
+msme_calculator
 
 # ── OS / editor ────────────────────────────────────────────────────────
 .DS_Store
@@ -30,5 +32,4 @@ Thumbs.db
 .vscode/
 
 # ── Temp uploads (generated at runtime) ───────────────────────────────
-msmed_calculator/uploads/msmed_calculator/msme_calculator.exe
-msmed_calculator/dist/
+/uploads/
