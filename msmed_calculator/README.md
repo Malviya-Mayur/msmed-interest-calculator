@@ -6,22 +6,32 @@ No Python, no server setup, no installation required for end users — just run 
 
 ---
 
-## 🚀 Quick Start (Standalone Executable)
+## ⬇️ Downloads
+
+| Platform | Download | Notes |
+|---|---|---|
+| 🐧 **Linux** (x86-64) | [**msme_calculator-linux-x86_64**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64) | Single file, no install needed |
+| 🪟 **Windows** (x86-64) | [**All Releases →**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases) | Build with `build_windows.bat` on Windows |
+
+> 📦 View all releases: [github.com/…/releases](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases)
+
+---
+
+## 🚀 Quick Start
 
 ### Linux
 ```bash
-chmod +x msme_calculator          # one-time only
-./msme_calculator
+wget https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64
+chmod +x msme_calculator-linux-x86_64
+./msme_calculator-linux-x86_64
 ```
 
 ### Windows
 ```
-Double-click msme_calculator.exe
+Download and double-click msme_calculator.exe
 ```
 
-The app automatically starts a local server and opens your browser at `http://127.0.0.1:8000`. Press **Ctrl-C** (or close the terminal) to stop.
-
-> **Download the latest binary from [GitHub Releases](../../releases).**
+The app starts a local server and opens your browser at `http://127.0.0.1:8000`.
 
 ---
 
@@ -29,18 +39,18 @@ The app automatically starts a local server and opens your browser at `http://12
 
 ### 🐧 Linux
 
-1. Go to [Releases](../../releases) and download `msme_calculator`
+1. [Download `msme_calculator-linux-x86_64`](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64)
 2. Open a terminal in the download folder and run:
    ```bash
-   chmod +x msme_calculator    # make it executable (one-time only)
-   ./msme_calculator            # launch the app
+   chmod +x msme_calculator-linux-x86_64    # make it executable (one-time only)
+   ./msme_calculator-linux-x86_64           # launch the app
    ```
 3. Your browser opens automatically at `http://127.0.0.1:8000`
 4. To stop the app, press **Ctrl-C** in the terminal
 
 ### 🪟 Windows
 
-1. Go to [Releases](../../releases) and download `msme_calculator.exe`
+1. [Download `msme_calculator.exe`](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases) from the Releases page
 2. **Double-click** `msme_calculator.exe`
    - If Windows Defender SmartScreen appears, click **"More info" → "Run anyway"** (the app is safe — it's just unsigned)
 3. A terminal window opens and your browser launches at `http://127.0.0.1:8000`
