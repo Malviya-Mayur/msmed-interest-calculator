@@ -10,8 +10,8 @@ No Python, no server setup, no installation required for end users — just run 
 
 | Platform | Download | Notes |
 |---|---|---|
-| 🐧 **Linux** (x86-64) | [**msme_calculator-linux-x86_64**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64) | Single file, no install needed |
-| 🪟 **Windows** (x86-64) | [**msme_calculator-windows-x86_64.exe**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-windows-x86_64.exe) | Single file, no install needed |
+| 🐧 **Linux** (x86-64) | [**msme_calculator-linux-x86_64**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.1.0/msme_calculator-linux-x86_64) | Single file, no install needed |
+| 🪟 **Windows** (x86-64) | [**msme_calculator-windows-x86_64.exe**](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.1.0/msme_calculator-windows-x86_64.exe) | Single file, no install needed |
 
 > 📦 View all releases: [github.com/…/releases](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases)
 
@@ -21,7 +21,7 @@ No Python, no server setup, no installation required for end users — just run 
 
 ### Linux
 ```bash
-wget https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64
+wget https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.1.0/msme_calculator-linux-x86_64
 chmod +x msme_calculator-linux-x86_64
 ./msme_calculator-linux-x86_64
 ```
@@ -39,7 +39,7 @@ The app starts a local server and opens your browser at `http://127.0.0.1:8000`.
 
 ### 🐧 Linux
 
-1. [Download `msme_calculator-linux-x86_64`](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.0.0/msme_calculator-linux-x86_64)
+1. [Download `msme_calculator-linux-x86_64`](https://github.com/Malviya-Mayur/msmed-interest-calculator/releases/download/v1.1.0/msme_calculator-linux-x86_64)
 2. Open a terminal in the download folder and run:
    ```bash
    chmod +x msme_calculator-linux-x86_64    # make it executable (one-time only)
