@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 import pandas as pd
 
-from ingestion.validator import validate, ValidationError, ValidationResult
+from ingestion.validator import validate, ValidationError, ValidationResult, apply_column_mapping
 
 
 def make_valid_df():
@@ -162,3 +162,65 @@ class TestValidatorBusinessRules:
         result = validate(df)
         assert result.is_valid is True
         assert len(result.clean_df) == 7
+
+
+class TestApplyColumnMapping:
+
+    def _make_custom_df(self):
+        """DataFrame with non-standard column names."""
+        return pd.DataFrame({
+            "Supplier Code": ["V01", "V01"],
+            "Invoice Amount": ["-10000", "10000"],
+            "Invoice Date": ["2025-01-01", "2025-06-01"],
+            "Supplier Name": ["Acme Ltd", "Acme Ltd"],
+            "Ref No": ["INV-001", "PAY-001"],
+            "Remarks": ["Purchase", "Payment"],
+        })
+
+    def test_renames_required_columns(self):
+        df = self._make_custom_df()
+        mapping = {
+            "Supplier Code": "vendor_id",
+            "Invoice Amount": "transactions",
+            "Invoice Date": "dates",
+        }
+        result = apply_column_mapping(df, mapping)
+        assert "vendor_id" in result.columns
+        assert "transactions" in result.columns
+        assert "dates" in result.columns
+
+    def test_unmapped_columns_pass_through(self):
+        df = self._make_custom_df()
+        mapping = {"Supplier Code": "vendor_id"}
+        result = apply_column_mapping(df, mapping)
+        # Unmapped cols should still be present under original names
+        assert "Invoice Amount" in result.columns
+        assert "Invoice Date" in result.columns
+        assert "vendor_id" in result.columns
+
+    def test_empty_mapping_is_noop(self):
+        df = self._make_custom_df()
+        result = apply_column_mapping(df, {})
+        assert list(result.columns) == list(df.columns)
+
+    def test_empty_string_value_is_ignored(self):
+        df = self._make_custom_df()
+        # Empty target value = user didn't pick a mapping for that col
+        mapping = {"Supplier Code": "vendor_id", "Invoice Amount": ""}
+        result = apply_column_mapping(df, mapping)
+        assert "vendor_id" in result.columns
+        assert "Invoice Amount" in result.columns  # unchanged because value was empty
+
+    def test_full_pipeline_with_custom_columns(self):
+        """End-to-end: custom column names → mapping → validate → success."""
+        df = self._make_custom_df()
+        mapping = {
+            "Supplier Code": "vendor_id",
+            "Invoice Amount": "transactions",
+            "Invoice Date": "dates",
+            "Supplier Name": "vendor_name",
+        }
+        mapped_df = apply_column_mapping(df, mapping)
+        result = validate(mapped_df)
+        assert result.is_valid is True
+        assert len(result.clean_df) == 2

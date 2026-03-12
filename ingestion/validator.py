@@ -1,7 +1,7 @@
 # msmed_calculator/ingestion/validator.py
 import pandas as pd
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Dict
 
 
 class ValidationError(Exception):
@@ -17,6 +17,40 @@ class ValidationResult:
 
 
 REQUIRED_COLUMNS = {"vendor_id", "transactions", "dates"}
+
+# All fields the app knows about (required + optional)
+ALL_FIELDS = [
+    {"key": "vendor_id",      "label": "Vendor ID",       "required": True},
+    {"key": "transactions",   "label": "Transactions",    "required": True},
+    {"key": "dates",          "label": "Date",             "required": True},
+    {"key": "vendor_name",    "label": "Vendor Name",     "required": False},
+    {"key": "transaction_id", "label": "Transaction ID",  "required": False},
+    {"key": "narration",      "label": "Narration",       "required": False},
+]
+
+
+def apply_column_mapping(df: pd.DataFrame, mapping: Dict[str, str]) -> pd.DataFrame:
+    """
+    Rename DataFrame columns according to the user-supplied mapping.
+
+    mapping: {user_column_name: target_internal_name}
+    e.g. {"Supplier Code": "vendor_id", "Invoice Amt": "transactions"}
+
+    - Only renames columns present in the mapping AND in df.
+    - Columns not in the mapping are left unchanged.
+    - Empty string values in mapping are ignored (user chose "skip").
+    """
+    if not mapping:
+        return df
+
+    # Filter to only valid, non-empty mappings where the source col actually exists
+    rename_map = {
+        src: tgt
+        for src, tgt in mapping.items()
+        if src and tgt and src in df.columns
+    }
+
+    return df.rename(columns=rename_map)
 
 
 def validate(df: pd.DataFrame) -> ValidationResult:

@@ -60,9 +60,10 @@ The app starts a local server and opens your browser at `http://127.0.0.1:8000`.
 
 ---
 
-## �🖥️ How to Use
+## 🖥️ How to Use
 
 1. **Upload your file** — drag & drop or browse for a `.csv` or `.xlsx` vendor ledger
+   > **Note:** Your column names don't need to match exactly! A **Column Mapping** panel will appear, automatically detecting your columns (like `Amount` → `transactions`, `Supplier Code` → `vendor_id`).
 2. **Set parameters:**
    - **Annual Interest Rate (%)** — typically 3× the RBI bank rate (e.g. RBI 6.5% → enter 19.5%)
    - **Credit Term (Days)** — statutory limit is 45 days; adjust only if a different agreed period applies
@@ -75,20 +76,23 @@ The app starts a local server and opens your browser at `http://127.0.0.1:8000`.
 
 ## 📋 Input File Format
 
-Upload a `.csv` or `.xlsx` file with these columns (column names must match exactly):
+Upload a `.csv` or `.xlsx` file containing your vendor ledger data.
 
-| Column | Type | Required | Description |
-|---|---|---|---|
-| `transaction_id` | string | No | Unique transaction ID |
-| `vendor_id` | string | **Yes** | Vendor / supplier identifier |
-| `vendor_name` | string | No | Human-readable vendor name |
-| `transactions` | number | **Yes** | **Negative = Purchase / Invoice**, Positive = Payment received |
-| `dates` | YYYY-MM-DD | **Yes** | Date of the transaction |
-| `narration` | string | No | Free-text description / remarks |
+| Required Field | Type | Description |
+|---|---|---|
+| `vendor_id` | string | Vendor / supplier identifier |
+| `transactions` | number | **Negative = Purchase / Invoice**, Positive = Payment received |
+| `dates` | YYYY-MM-DD | Date of the transaction |
 
-> A sample file (`Sample File.xlsx`) is included in the repository for reference.
+| Optional Field | Type | Description |
+|---|---|---|
+| `transaction_id` | string | Unique transaction ID / invoice number |
+| `vendor_name` | string | Human-readable vendor name |
+| `narration` | string | Free-text description / remarks |
 
-**Tip:** The file can have 1–2 blank rows or a title row above the column headers — the app will auto-detect the correct header row.
+> 💡 **Smart Column Mapping:** You do **not** need to rename your columns before uploading. The app will visually ask you to match your file's columns to these required fields. It even auto-detects common names automatically.
+>
+> A sample file (`Sample File.xlsx`) is included in the repository for reference. The app will also auto-detect the correct header row even if you have blank rows or titles at the top of your file.
 
 ---
 

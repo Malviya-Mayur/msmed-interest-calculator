@@ -3,23 +3,25 @@
 FastAPI route handlers for the MSMED Interest Calculator.
 
 Routes:
-  GET  /          → Upload form (index.html)
-  POST /calculate → Full pipeline: load → validate → map → interest → report → excel
-  GET  /download  → Serve generated Excel file
-  GET  /health    → Health check
+  GET  /               → Upload form (index.html)
+  POST /preview-columns→ Return JSON list of column names from uploaded file
+  POST /calculate      → Full pipeline: load → map → validate → interest → report → excel
+  GET  /download       → Serve generated Excel file
+  GET  /health         → Health check
 """
 
 import os
 import tempfile
 from io import BytesIO
+from typing import Optional
 
 import pandas as pd
 from fastapi import APIRouter, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from ingestion.loader import load_transactions
-from ingestion.validator import validate, ValidationError
+from ingestion.loader import load_transactions, load_raw_columns
+from ingestion.validator import validate, apply_column_mapping, ValidationError, ALL_FIELDS
 from engine.mapper import generate_settlement_ledger
 from engine.interest import calculate_interest
 from output.reporter import build_detailed_report, build_summary_report
@@ -48,6 +50,40 @@ async def index(request: Request):
     )
 
 
+@router.post("/preview-columns")
+async def preview_columns(file: UploadFile = File(...)):
+    """
+    Accept a file upload and return its column names as JSON.
+    Does NOT store the file or perform any validation — purely for populating
+    the column-mapping UI on the frontend.
+    """
+    suffix = os.path.splitext(file.filename)[1].lower()
+    if suffix not in (".csv", ".xlsx", ".xls"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{suffix}'. Please upload a .csv or .xlsx file.",
+        )
+
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        columns = load_raw_columns(tmp_path)
+        return JSONResponse({"columns": columns, "filename": file.filename})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+
 @router.post("/calculate", response_class=HTMLResponse)
 async def calculate(
     request: Request,
@@ -55,10 +91,17 @@ async def calculate(
     interest_rate: float = Form(...),
     credit_term_days: int = Form(CREDIT_TERM_DAYS),
     interest_method: str = Form("compound"),
+    # ── Column mapping fields (all optional) ─────────────────────────────
+    map_vendor_id: Optional[str] = Form(None),
+    map_transactions: Optional[str] = Form(None),
+    map_dates: Optional[str] = Form(None),
+    map_vendor_name: Optional[str] = Form(None),
+    map_transaction_id: Optional[str] = Form(None),
+    map_narration: Optional[str] = Form(None),
 ):
     errors = []
-    
-    # ── 1. Save uploaded file to temp path ────────────────────────────────
+
+    # ── 1. Validate file type ──────────────────────────────────────────────
     suffix = os.path.splitext(file.filename)[1].lower()
     if suffix not in (".csv", ".xlsx", ".xls"):
         errors.append(f"Unsupported file type '{suffix}'. Please upload a .csv or .xlsx file.")
@@ -77,7 +120,26 @@ async def calculate(
         # ── 2. Load ────────────────────────────────────────────────────────
         raw_df = load_transactions(tmp_path)
 
-        # ── 3. Validate ────────────────────────────────────────────────────
+        # ── 3. Apply column mapping (if provided) ──────────────────────────
+        # Build a {user_col → internal_col} dict from the submitted form fields.
+        # Empty / None values mean "skip this field".
+        column_mapping = {}
+        mapping_pairs = [
+            (map_vendor_id,      "vendor_id"),
+            (map_transactions,   "transactions"),
+            (map_dates,          "dates"),
+            (map_vendor_name,    "vendor_name"),
+            (map_transaction_id, "transaction_id"),
+            (map_narration,      "narration"),
+        ]
+        for user_col, internal_col in mapping_pairs:
+            if user_col and user_col.strip():
+                column_mapping[user_col.strip()] = internal_col
+
+        if column_mapping:
+            raw_df = apply_column_mapping(raw_df, column_mapping)
+
+        # ── 4. Validate ────────────────────────────────────────────────────
         try:
             validation_result = validate(raw_df)
         except ValidationError as e:
@@ -92,7 +154,7 @@ async def calculate(
         if validation_result.errors:
             errors.extend(validation_result.errors)
 
-        # ── 4. Settlement Ledger ───────────────────────────────────────────
+        # ── 5. Settlement Ledger ───────────────────────────────────────────
         ledger_df = generate_settlement_ledger(clean_df)
 
         if ledger_df.empty:
@@ -102,7 +164,7 @@ async def calculate(
                 {"request": request, "errors": errors, "default_interest_rate": interest_rate},
             )
 
-        # ── 5. Interest Calculation ────────────────────────────────────────
+        # ── 6. Interest Calculation ────────────────────────────────────────
         interest_df = calculate_interest(
             ledger_df,
             interest_rate,
@@ -110,20 +172,18 @@ async def calculate(
             interest_method=interest_method,
         )
 
-        # ── 6. Build Reports ───────────────────────────────────────
+        # ── 7. Build Reports ───────────────────────────────────────────────
         detailed_df = build_detailed_report(interest_df)
         summary_df = build_summary_report(interest_df, clean_df)
 
-        # ── 7. Generate Excel and store in memory ──────────────────────────
+        # ── 8. Generate Excel and store in memory ──────────────────────────
         excel_bytes = export_to_excel(detailed_df, summary_df)
         _excel_store["data"] = excel_bytes
         _excel_store["filename"] = f"msmed_report_{file.filename.rsplit('.', 1)[0]}.xlsx"
 
-        # ── 8. Render results page (first 100 rows) ────────────────────────
-        # Convert to list-of-dicts for Jinja2 templating
+        # ── 9. Render results page (first 100 rows) ────────────────────────
         detailed_preview = detailed_df.head(100).to_dict(orient="records")
         summary_records = summary_df.to_dict(orient="records")
-
         total_rows = len(detailed_df)
 
         return templates.TemplateResponse(
@@ -152,7 +212,6 @@ async def calculate(
              "default_credit_term": credit_term_days},
         )
     finally:
-        # Clean up temp file
         try:
             if 'tmp_path' in locals():
                 os.unlink(tmp_path)
@@ -164,11 +223,10 @@ async def calculate(
 async def download():
     if _excel_store["data"] is None:
         raise HTTPException(status_code=404, detail="No report available. Please calculate first.")
-    
-    # Reset position for reading
+
     excel_io: BytesIO = _excel_store["data"]
     excel_io.seek(0)
-    
+
     return StreamingResponse(
         excel_io,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

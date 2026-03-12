@@ -1,6 +1,7 @@
 # msmed_calculator/ingestion/loader.py
 import pandas as pd
 from pathlib import Path
+from typing import List
 
 # Columns that must appear (lowercased) to identify the real header row
 _REQUIRED_HEADER_COLS = {"transactions", "dates", "vendor_id"}
@@ -65,3 +66,27 @@ def load_transactions(file_path: str) -> pd.DataFrame:
         df["dates"] = pd.to_datetime(df["dates"], dayfirst=False, errors="coerce")
 
     return df
+
+
+def load_raw_columns(file_path: str) -> List[str]:
+    """
+    Return only the column names of the uploaded file without full parsing.
+    Used by the /preview-columns endpoint to populate the mapping UI.
+    Handles leading blank/title rows using the same heuristic as load_transactions.
+    """
+    path = Path(file_path) if isinstance(file_path, str) else None
+    suffix = path.suffix.lower() if path else ".csv"
+
+    if suffix not in (".csv", ".xlsx", ".xls"):
+        raise ValueError(f"Unsupported file type: '{suffix}'.")
+
+    # Try to locate the real header row first; fall back to row 0
+    header_row = _find_header_row(file_path, suffix)
+
+    if suffix == ".csv":
+        probe = pd.read_csv(file_path, header=header_row, nrows=0, dtype=str)
+    else:
+        probe = pd.read_excel(file_path, header=header_row, nrows=0, dtype=str)
+
+    # Return cleaned column names (strip whitespace)
+    return [str(c).strip() for c in probe.columns]

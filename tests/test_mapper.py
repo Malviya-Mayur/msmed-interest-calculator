@@ -148,3 +148,95 @@ class TestFIFOSettlement:
         ledger = generate_settlement_ledger(df)
         v01 = ledger[ledger["vendor_id"] == "V01"]
         assert len(v01) == 5
+
+
+class TestFIFODateOrdering:
+    """
+    Regression tests ensuring that the FIFO settlement always uses DATE order,
+    not row/file order — regardless of how the input rows are arranged.
+    """
+
+    def test_purchase_settled_by_future_payment_not_past_payment(self):
+        """
+        The key regression test for the date-ordering bug.
+
+        Timeline:
+          Jan 1  → Purchase 10k  (P1)
+          Mar 1  → Payment  15k  (Pay1) — settles P1 fully (10k), leaving 5k surplus
+          Jun 1  → Purchase 10k  (P2)   — gets 5k from Pay1 surplus (Advance),
+                                          then 5k from Pay2 (Standard)
+          Aug 1  → Payment  10k  (Pay2) — used to settle P2 remainder
+
+        Key assertion: the old bug caused Pay1 (Mar 1) to consume ALL 15k for P1
+        (which was only 10k — but the pooling was correct). The important test is
+        that Pay2 (Aug 1) is correctly used for P2, not just left as unsettled.
+        """
+        df = make_df(
+            transactions=[15000, -10000, 10000, -10000],
+            dates=["2025-03-01", "2025-01-01", "2025-08-01", "2025-06-01"],
+        )
+        ledger = generate_settlement_ledger(df)
+
+        # P1 (Jan 1) must be fully settled (10k) by Pay1 (Mar 1)
+        p1 = ledger[ledger["purchase_date"] == pd.Timestamp("2025-01-01").date()]
+        assert p1["amount_settled"].sum() == 10000.0
+        assert all(p1["payment_date"] == pd.Timestamp("2025-03-01").date())
+        assert all(p1["settlement_type"] == "Standard")
+
+        # P2 (Jun 1) must be fully settled (10k total); some from Pay1 remainder,
+        # some from Pay2. No "Unsettled" rows.
+        p2 = ledger[ledger["purchase_date"] == pd.Timestamp("2025-06-01").date()]
+        assert p2["amount_settled"].sum() == 10000.0
+        assert "Unsettled" not in p2["settlement_type"].values
+        # Pay2 (Aug 1) must be used for P2 — at least one row must reference Aug 1
+        assert pd.Timestamp("2025-08-01").date() in p2["payment_date"].values
+
+    def test_standard_settlement_type_requires_payment_after_purchase(self):
+        """
+        All Standard rows must have payment_date > purchase_date.
+        All Advance rows must have payment_date < purchase_date.
+        """
+        df = make_df(
+            transactions=[-100000, -15000, -30210, 100000, -65000, 80000, 50000],
+            dates=["2025-04-01", "2025-05-06", "2025-07-31",
+                   "2025-08-18", "2025-11-25", "2025-10-19", "2025-10-31"],
+        )
+        ledger = generate_settlement_ledger(df)
+
+        standard_rows = ledger[ledger["settlement_type"] == "Standard"]
+        for _, row in standard_rows.iterrows():
+            assert row["payment_date"] > row["purchase_date"], (
+                f"Standard row has payment_date {row['payment_date']} "
+                f"<= purchase_date {row['purchase_date']}"
+            )
+
+        advance_rows = ledger[ledger["settlement_type"] == "Advance"]
+        for _, row in advance_rows.iterrows():
+            assert row["payment_date"] < row["purchase_date"], (
+                f"Advance row has payment_date {row['payment_date']} "
+                f">= purchase_date {row['purchase_date']}"
+            )
+
+    def test_out_of_order_rows_produce_same_result_as_sorted_rows(self):
+        """
+        Giving the engine rows in random order should produce the same
+        settlement result as giving them in date order.
+        """
+        sorted_df = make_df(
+            transactions=[-10000, -5000, 10000, 5000],
+            dates=["2025-01-01", "2025-02-01", "2025-06-01", "2025-07-01"],
+        )
+        scrambled_df = make_df(
+            transactions=[10000, -5000, 5000, -10000],
+            dates=["2025-06-01", "2025-02-01", "2025-07-01", "2025-01-01"],
+        )
+
+        ledger_sorted = generate_settlement_ledger(sorted_df)
+        ledger_scrambled = generate_settlement_ledger(scrambled_df)
+
+        # Both should produce the same number of rows
+        assert len(ledger_sorted) == len(ledger_scrambled)
+
+        # Total amount settled should match
+        assert round(ledger_sorted["amount_settled"].sum(), 2) == \
+               round(ledger_scrambled["amount_settled"].sum(), 2)

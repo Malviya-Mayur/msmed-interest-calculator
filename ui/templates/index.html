@@ -67,7 +67,7 @@
             </label>
             <div class="file-drop-zone" id="drop-zone">
               <div class="file-icon">📊</div>
-              <p class="drop-text">Drag & drop your file here, or <span class="browse-link">browse</span></p>
+              <p class="drop-text">Drag &amp; drop your file here, or <span class="browse-link">browse</span></p>
               <p class="drop-hint">Accepts <strong>.csv</strong> and <strong>.xlsx</strong> files</p>
               <input type="file" id="file" name="file" accept=".csv,.xlsx,.xls" required class="file-input" />
             </div>
@@ -76,6 +76,30 @@
               <span id="file-name-display"></span>
               <button type="button" class="clear-file" id="clear-file">✕</button>
             </div>
+          </div>
+
+          <!-- Column Mapping Section (hidden until file is uploaded) -->
+          <div class="mapping-card" id="column-mapping-section" style="display:none;">
+            <div class="mapping-card-header">
+              <span class="mapping-icon">🔗</span>
+              <div>
+                <div class="mapping-title">Column Mapping</div>
+                <div class="mapping-subtitle">Match your file's columns to the required fields</div>
+              </div>
+              <div class="mapping-status" id="mapping-status"></div>
+            </div>
+
+            <!-- Loading state -->
+            <div class="mapping-loading" id="mapping-loading">
+              <div class="spinner"></div>
+              <span>Reading columns…</span>
+            </div>
+
+            <!-- Mapping grid (populated by JS) -->
+            <div class="mapping-grid" id="mapping-grid" style="display:none;"></div>
+
+            <!-- Mapping error -->
+            <div class="mapping-error" id="mapping-error" style="display:none;"></div>
           </div>
 
           <!-- Parameters Row -->
@@ -191,6 +215,9 @@
             </tbody>
           </table>
         </div>
+        <p class="form-hint" style="margin-top:0.75rem; padding:0 0.25rem;">
+          💡 <strong>Don't know the exact column names?</strong> Just upload your file — the <strong>Column Mapping</strong> panel will appear and let you assign your columns to the required fields.
+        </p>
       </div>
     </main>
 
@@ -200,6 +227,154 @@
   </div>
 
   <script>
+    // ── Fuzzy auto-match table ────────────────────────────────────────────────
+    // Maps internal field keys to common alias patterns (lowercase)
+    const AUTO_MATCH = {
+      vendor_id:      ['vendor_id', 'vendor id', 'supplier_id', 'supplier id', 'supplier code',
+                       'vendorid', 'supplierid', 'party_id', 'partyid', 'party code', 'party id'],
+      transactions:   ['transactions', 'transaction', 'amount', 'amt', 'invoice_amount',
+                       'invoice amount', 'invoice_amt', 'debit', 'credit', 'value', 'net_amount',
+                       'net amount', 'txn_amount', 'txn amount'],
+      dates:          ['dates', 'date', 'invoice_date', 'invoice date', 'txn_date', 'txn date',
+                       'transaction_date', 'transaction date', 'voucher_date', 'voucher date',
+                       'posting_date', 'doc_date'],
+      vendor_name:    ['vendor_name', 'vendor name', 'supplier_name', 'supplier name', 'party_name',
+                       'party name', 'vendorname', 'suppliername'],
+      transaction_id: ['transaction_id', 'transaction id', 'txn_id', 'txn id', 'invoice_no',
+                       'invoice no', 'invoice_number', 'invoice number', 'doc_no', 'voucher_no',
+                       'ref_no'],
+      narration:      ['narration', 'narr', 'description', 'desc', 'remarks', 'particulars',
+                       'details', 'notes', 'note', 'comment'],
+    };
+
+    // All target fields in display order
+    const TARGET_FIELDS = [
+      { key: 'vendor_id',      label: 'Vendor ID',       required: true,  formName: 'map_vendor_id' },
+      { key: 'transactions',   label: 'Transactions',    required: true,  formName: 'map_transactions' },
+      { key: 'dates',          label: 'Date',             required: true,  formName: 'map_dates' },
+      { key: 'vendor_name',    label: 'Vendor Name',     required: false, formName: 'map_vendor_name' },
+      { key: 'transaction_id', label: 'Transaction ID',  required: false, formName: 'map_transaction_id' },
+      { key: 'narration',      label: 'Narration',       required: false, formName: 'map_narration' },
+    ];
+
+    function findBestMatch(columns, fieldKey) {
+      const patterns = AUTO_MATCH[fieldKey] || [];
+      const colsLower = columns.map(c => c.toLowerCase().trim());
+      for (const pattern of patterns) {
+        const idx = colsLower.indexOf(pattern);
+        if (idx !== -1) return columns[idx];
+      }
+      return '';
+    }
+
+    function buildMappingGrid(columns) {
+      const grid = document.getElementById('mapping-grid');
+      grid.innerHTML = '';
+
+      TARGET_FIELDS.forEach(field => {
+        const bestMatch = findBestMatch(columns, field.key);
+
+        const row = document.createElement('div');
+        row.className = 'mapping-row';
+
+        const badge = field.required
+          ? `<span class="mapping-badge mapping-badge-required">Required</span>`
+          : `<span class="mapping-badge mapping-badge-optional">Optional</span>`;
+
+        const arrow = `<div class="mapping-arrow">→</div>`;
+
+        // Build options
+        let options = `<option value="">— Not in my file —</option>`;
+        columns.forEach(col => {
+          const selected = col === bestMatch ? ' selected' : '';
+          options += `<option value="${escapeHtml(col)}"${selected}>${escapeHtml(col)}</option>`;
+        });
+
+        row.innerHTML = `
+          <div class="mapping-field-label">
+            <span class="mapping-field-name">${field.label}</span>
+            ${badge}
+          </div>
+          ${arrow}
+          <div class="mapping-select-wrap">
+            <select class="mapping-select" name="${field.formName}" id="map_${field.key}">
+              ${options}
+            </select>
+            ${bestMatch ? '<span class="mapping-auto-tag">auto-detected</span>' : ''}
+          </div>
+        `;
+        grid.appendChild(row);
+      });
+
+      grid.style.display = 'grid';
+      updateMappingStatus();
+    }
+
+    function updateMappingStatus() {
+      const status = document.getElementById('mapping-status');
+      let missingRequired = [];
+      TARGET_FIELDS.filter(f => f.required).forEach(f => {
+        const sel = document.getElementById(`map_${f.key}`);
+        if (sel && !sel.value) missingRequired.push(f.label);
+      });
+      if (missingRequired.length === 0) {
+        status.textContent = '✅ All required fields mapped';
+        status.className = 'mapping-status mapping-status-ok';
+      } else {
+        status.textContent = `⚠️ Unmapped: ${missingRequired.join(', ')}`;
+        status.className = 'mapping-status mapping-status-warn';
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function fetchColumns(file) {
+      const section = document.getElementById('column-mapping-section');
+      const loading = document.getElementById('mapping-loading');
+      const grid = document.getElementById('mapping-grid');
+      const errEl = document.getElementById('mapping-error');
+
+      // Show section with loading state
+      section.style.display = 'block';
+      loading.style.display = 'flex';
+      grid.style.display = 'none';
+      errEl.style.display = 'none';
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const resp = await fetch('/preview-columns', { method: 'POST', body: formData });
+        const data = await resp.json();
+        loading.style.display = 'none';
+
+        if (!resp.ok) {
+          errEl.textContent = '⚠️ ' + (data.detail || 'Could not read file columns.');
+          errEl.style.display = 'block';
+          return;
+        }
+        if (!data.columns || data.columns.length === 0) {
+          errEl.textContent = '⚠️ No columns found in the uploaded file.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        buildMappingGrid(data.columns);
+
+        // Listen for select changes to update status
+        document.querySelectorAll('.mapping-select').forEach(sel => {
+          sel.addEventListener('change', updateMappingStatus);
+        });
+
+      } catch (e) {
+        loading.style.display = 'none';
+        errEl.textContent = '⚠️ Failed to read file: ' + e.message;
+        errEl.style.display = 'block';
+      }
+    }
+
     // ── Preview updater (rate + credit term + method) ───────────────────────
     const rateInput = document.getElementById('interest_rate');
     const termInput = document.getElementById('credit_term_days');
@@ -233,7 +408,9 @@
     const browseLink = dropZone.querySelector('.browse-link');
 
     browseLink.addEventListener('click', () => fileInput.click());
-    dropZone.addEventListener('click', (e) => { if (e.target !== browseLink) fileInput.click(); });
+    dropZone.addEventListener('click', (e) => { 
+      if (e.target !== browseLink && e.target !== fileInput) fileInput.click(); 
+    });
 
     dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
     dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -242,24 +419,28 @@
       dropZone.classList.remove('drag-over');
       if (e.dataTransfer.files.length) {
         fileInput.files = e.dataTransfer.files;
-        showFile(e.dataTransfer.files[0].name);
+        handleFileSelected(e.dataTransfer.files[0]);
       }
     });
 
     fileInput.addEventListener('change', () => {
-      if (fileInput.files.length) showFile(fileInput.files[0].name);
+      if (fileInput.files.length) handleFileSelected(fileInput.files[0]);
     });
 
-    function showFile(name) {
+    function handleFileSelected(file) {
       dropZone.style.display = 'none';
       fileSelected.style.display = 'flex';
-      fileNameDisplay.textContent = name;
+      fileNameDisplay.textContent = file.name;
+      fetchColumns(file);
     }
 
     clearFileBtn.addEventListener('click', () => {
       fileInput.value = '';
       dropZone.style.display = 'flex';
       fileSelected.style.display = 'none';
+      document.getElementById('column-mapping-section').style.display = 'none';
+      document.getElementById('mapping-grid').innerHTML = '';
+      document.getElementById('mapping-grid').style.display = 'none';
     });
 
     // ── Submit loading state ──────────────────────────────────────────────
